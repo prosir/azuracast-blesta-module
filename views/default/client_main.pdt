@@ -1,0 +1,7 @@
+<h2><?php echo $this->Html->safe($this->view->client->station_name); ?></h2>
+<p><?php echo $this->Html->safe($this->view->client->description); ?></p>
+
+<!-- Add the Login to AzuraCast button -->
+<a href="<?php echo $this->base_uri; ?>azuracast/login/<?php echo $this->Html->safe($this->view->client->station_id); ?>" class="btn btn-primary">
+    Login to AzuraCast
+</a>
