@@ -6,7 +6,7 @@ class AzuracastModule extends Module {
 
         $this->name = "Azuracast Module";
         $this->version = "1.0.0";
-        $this->authors = array(array('name' => 'Prosir', 'url' => 'https://jaccodw.nl'));
+        $this->authors = array(array('name' => 'Your Name', 'url' => 'https://yourwebsite.com'));
     }
 
     public function install() {
@@ -18,10 +18,43 @@ class AzuracastModule extends Module {
             ->create('azuracast_login_tokens');
     }
 
+    /**
+     * Module configuration fields
+     */
+    public function getSettings($module_row_id = null) {
+        return array(
+            'station_url' => array(
+                'label' => Language::_("AzuracastModule.config.station_url", true),
+                'type' => 'text'
+            ),
+            'api_key' => array(
+                'label' => Language::_("AzuracastModule.config.api_key", true),
+                'type' => 'text'
+            )
+        );
+    }
+
+    /**
+     * Fetch the module configuration settings
+     */
+    private function getConfig($module_row_id = null) {
+        $module_row = $this->getModuleRow($module_row_id);
+        return [
+            'station_url' => $module_row ? $module_row->meta->station_url : null,
+            'api_key' => $module_row ? $module_row->meta->api_key : null
+        ];
+    }
+
+    /**
+     * Add Service
+     */
     public function addService($package, array $vars = null) {
-        $api_url = "https://your-azuracast-instance.com/api/station";
-        $api_key = "your_azuracast_api_key"; 
-        
+        // Fetch configuration
+        $config = $this->getConfig();
+
+        $api_url = $config['station_url'] . "/api/station";
+        $api_key = $config['api_key']; 
+
         $data = array(
             'name' => $vars['station_name'],
             'short_name' => $vars['station_short_name'],
@@ -41,9 +74,10 @@ class AzuracastModule extends Module {
     }
 
     private function generateAzuraCastLoginToken($email) {
-        $api_url = "https://your-azuracast-instance.com/api/auth/login-token";
-        $api_key = "your_azuracast_api_key"; 
-        
+        $config = $this->getConfig();
+        $api_url = $config['station_url'] . "/api/auth/login-token";
+        $api_key = $config['api_key']; 
+
         $data = array(
             'user' => $email,
             'expires_at' => strtotime("+1 hour")
@@ -95,7 +129,8 @@ class AzuracastModule extends Module {
         $token = $this->getValidLoginToken($station_id);
         
         if ($token) {
-            $login_url = "https://your-azuracast-instance.com/api/auth/login?token=" . $token;
+            $config = $this->getConfig();
+            $login_url = $config['station_url'] . "/api/auth/login?token=" . $token;
             header("Location: " . $login_url);
             exit;
         } else {
