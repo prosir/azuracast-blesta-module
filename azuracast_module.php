@@ -3,8 +3,7 @@ class AzuracastModule extends Module {
 
     public function __construct() {
         Language::loadLang("azuracast_module", null, dirname(__FILE__) . DS . "language" . DS);
-
-        // Basic module information
+        
         $this->name = "Azuracast Module";
         $this->version = "1.0.0";
         $this->authors = array(array('name' => 'Your Name', 'url' => 'https://yourwebsite.com'));
@@ -26,17 +25,17 @@ class AzuracastModule extends Module {
         return array(
             'station_url' => array(
                 'label' => Language::_("AzuracastModule.config.station_url", true),
-                'type' => 'text',  // Input field type for Station URL
-                'tooltip' => Language::_("AzuracastModule.config.station_url.tooltip", true), // Tooltip for Station URL
-                'value' => (isset($vars['station_url']) ? $vars['station_url'] : null),  // Current value
-                'required' => true  // Make the field required
+                'type' => 'text',
+                'tooltip' => Language::_("AzuracastModule.config.station_url.tooltip", true),
+                'value' => (isset($vars['station_url']) ? $vars['station_url'] : null),
+                'required' => true
             ),
             'api_key' => array(
                 'label' => Language::_("AzuracastModule.config.api_key", true),
-                'type' => 'text',    // Input field type for API Key
-                'tooltip' => Language::_("AzuracastModule.config.api_key.tooltip", true),   // Tooltip for API Key
-                'value' => (isset($vars['api_key']) ? $vars['api_key'] : null),  // Current value
-                'required' => true  // Make the field required
+                'type' => 'text',
+                'tooltip' => Language::_("AzuracastModule.config.api_key.tooltip", true),
+                'value' => (isset($vars['api_key']) ? $vars['api_key'] : null),
+                'required' => true
             )
         );
     }
@@ -46,7 +45,16 @@ class AzuracastModule extends Module {
      */
     public function saveSettings($vars) {
         if (isset($vars['station_url']) && isset($vars['api_key'])) {
-            // Save the module settings (Blesta stores as meta fields)
+            // Encrypt the API key before storing
+            $encrypted_api_key = $this->encryptData($vars['api_key']);
+
+            // Store encrypted API key and station URL
+            $meta = [
+                'station_url' => $vars['station_url'],
+                'api_key' => $encrypted_api_key
+            ];
+
+            $this->saveModuleSettings($meta);  // Save module settings to the database
             return array('success' => true);
         } else {
             return array('error' => true, 'message' => "Both Station URL and API Key are required.");
@@ -58,9 +66,13 @@ class AzuracastModule extends Module {
      */
     private function getConfig($module_row_id = null) {
         $module_row = $this->getModuleRow($module_row_id);
+
+        // Decrypt the API key before returning it
+        $decrypted_api_key = $module_row ? $this->decryptData($module_row->meta->api_key) : null;
+
         return [
             'station_url' => $module_row ? $module_row->meta->station_url : null,
-            'api_key' => $module_row ? $module_row->meta->api_key : null
+            'api_key' => $decrypted_api_key
         ];
     }
 
@@ -71,7 +83,7 @@ class AzuracastModule extends Module {
         $config = $this->getConfig();
 
         $api_url = $config['station_url'] . "/api/station";
-        $api_key = $config['api_key']; 
+        $api_key = $config['api_key'];
 
         $data = array(
             'name' => $vars['station_name'],
@@ -97,7 +109,7 @@ class AzuracastModule extends Module {
     private function generateAzuraCastLoginToken($email) {
         $config = $this->getConfig();
         $api_url = $config['station_url'] . "/api/auth/login-token";
-        $api_key = $config['api_key']; 
+        $api_key = $config['api_key'];
 
         $data = array(
             'user' => $email,
@@ -105,11 +117,11 @@ class AzuracastModule extends Module {
         );
 
         $response = $this->azuracastApiRequest($api_url, $data, $api_key);
-        
+
         if (isset($response['token'])) {
             return $response['token'];
         }
-        
+
         return null;
     }
 
@@ -118,7 +130,7 @@ class AzuracastModule extends Module {
      */
     private function azuracastApiRequest($url, $data, $api_key) {
         $ch = curl_init();
-        
+
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_POST, 1);
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
@@ -127,32 +139,38 @@ class AzuracastModule extends Module {
             'Content-Type: application/json',
             'Authorization: Bearer ' . $api_key
         ));
-        
+
         $response = curl_exec($ch);
         curl_close($ch);
-        
+
         return json_decode($response, true);
     }
 
     /**
-     * Store login token in the database
+     * Store login token in the database (encrypted)
      */
     private function storeLoginToken($station_id, $token) {
+        // Encrypt the session token before storing
+        $encrypted_token = $this->encryptData($token);
+
         $this->Record->insert('azuracast_login_tokens', [
             'station_id' => $station_id,
-            'token' => $token,
+            'token' => $encrypted_token,
             'expires_at' => date('Y-m-d H:i:s', strtotime('+1 hour'))
         ]);
     }
 
     /**
-     * Get stored login token for the station
+     * Get stored login token for the station (decrypt before returning)
      */
     private function getLoginToken($station_id) {
-        return $this->Record->select('token')
+        $token_data = $this->Record->select('token')
             ->from('azuracast_login_tokens')
             ->where('station_id', '=', $station_id)
             ->fetch();
+
+        // Decrypt the token before returning it
+        return $token_data ? $this->decryptData($token_data->token) : null;
     }
 
     /**
@@ -160,7 +178,7 @@ class AzuracastModule extends Module {
      */
     public function loginToAzuraCast($station_id) {
         $token = $this->getValidLoginToken($station_id);
-        
+
         if ($token) {
             $config = $this->getConfig();
             $login_url = $config['station_url'] . "/api/auth/login?token=" . $token;
@@ -179,12 +197,36 @@ class AzuracastModule extends Module {
             ->from('azuracast_login_tokens')
             ->where('station_id', '=', $station_id)
             ->fetch();
-        
+
         if ($token_data && strtotime($token_data->expires_at) > time()) {
-            return $token_data->token;
+            return $this->decryptData($token_data->token);
         }
 
         return $this->generateAzuraCastLoginToken($station_id);
+    }
+
+    /**
+     * Encrypt sensitive data (API key, session token)
+     */
+    private function encryptData($data) {
+        $encryption_key = getenv('BL_ENCRYPTION_KEY'); // Use environment variable
+        $iv = openssl_random_pseudo_bytes(openssl_cipher_iv_length('aes-256-cbc'));
+
+        $encrypted_data = openssl_encrypt($data, 'aes-256-cbc', $encryption_key, 0, $iv);
+
+        // Return encrypted data with IV (base64 encoded)
+        return base64_encode($encrypted_data . '::' . $iv);
+    }
+
+    /**
+     * Decrypt sensitive data (API key, session token)
+     */
+    private function decryptData($encrypted_data) {
+        $encryption_key = getenv('BL_ENCRYPTION_KEY');
+
+        list($encrypted_data, $iv) = explode('::', base64_decode($encrypted_data), 2);
+
+        return openssl_decrypt($encrypted_data, 'aes-256-cbc', $encryption_key, 0, $iv);
     }
 }
 ?>
