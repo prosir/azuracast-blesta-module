@@ -4,6 +4,7 @@ class AzuracastModule extends Module {
     public function __construct() {
         Language::loadLang("azuracast_module", null, dirname(__FILE__) . DS . "language" . DS);
 
+        // Basic module information
         $this->name = "Azuracast Module";
         $this->version = "1.0.0";
         $this->authors = array(array('name' => 'Your Name', 'url' => 'https://yourwebsite.com'));
@@ -19,23 +20,41 @@ class AzuracastModule extends Module {
     }
 
     /**
-     * Module configuration fields
+     * Module configuration fields (Station URL and API Key)
      */
     public function getSettings($module_row_id = null) {
         return array(
             'station_url' => array(
                 'label' => Language::_("AzuracastModule.config.station_url", true),
-                'type' => 'text'
+                'type' => 'text',  // Input field type for Station URL
+                'tooltip' => Language::_("AzuracastModule.config.station_url.tooltip", true), // Tooltip for Station URL
+                'value' => (isset($vars['station_url']) ? $vars['station_url'] : null),  // Current value
+                'required' => true  // Make the field required
             ),
             'api_key' => array(
                 'label' => Language::_("AzuracastModule.config.api_key", true),
-                'type' => 'text'
+                'type' => 'text',    // Input field type for API Key
+                'tooltip' => Language::_("AzuracastModule.config.api_key.tooltip", true),   // Tooltip for API Key
+                'value' => (isset($vars['api_key']) ? $vars['api_key'] : null),  // Current value
+                'required' => true  // Make the field required
             )
         );
     }
 
     /**
-     * Fetch the module configuration settings
+     * Save settings when admin updates configuration
+     */
+    public function saveSettings($vars) {
+        if (isset($vars['station_url']) && isset($vars['api_key'])) {
+            // Save the module settings (Blesta stores as meta fields)
+            return array('success' => true);
+        } else {
+            return array('error' => true, 'message' => "Both Station URL and API Key are required.");
+        }
+    }
+
+    /**
+     * Fetch stored module configuration (Station URL and API Key)
      */
     private function getConfig($module_row_id = null) {
         $module_row = $this->getModuleRow($module_row_id);
@@ -46,10 +65,9 @@ class AzuracastModule extends Module {
     }
 
     /**
-     * Add Service
+     * Add Service (Create a station)
      */
     public function addService($package, array $vars = null) {
-        // Fetch configuration
         $config = $this->getConfig();
 
         $api_url = $config['station_url'] . "/api/station";
@@ -73,6 +91,9 @@ class AzuracastModule extends Module {
         }
     }
 
+    /**
+     * Generate AzuraCast login token
+     */
     private function generateAzuraCastLoginToken($email) {
         $config = $this->getConfig();
         $api_url = $config['station_url'] . "/api/auth/login-token";
@@ -92,6 +113,9 @@ class AzuracastModule extends Module {
         return null;
     }
 
+    /**
+     * API request helper function
+     */
     private function azuracastApiRequest($url, $data, $api_key) {
         $ch = curl_init();
         
@@ -110,6 +134,9 @@ class AzuracastModule extends Module {
         return json_decode($response, true);
     }
 
+    /**
+     * Store login token in the database
+     */
     private function storeLoginToken($station_id, $token) {
         $this->Record->insert('azuracast_login_tokens', [
             'station_id' => $station_id,
@@ -118,6 +145,9 @@ class AzuracastModule extends Module {
         ]);
     }
 
+    /**
+     * Get stored login token for the station
+     */
     private function getLoginToken($station_id) {
         return $this->Record->select('token')
             ->from('azuracast_login_tokens')
@@ -125,6 +155,9 @@ class AzuracastModule extends Module {
             ->fetch();
     }
 
+    /**
+     * Redirect client to AzuraCast with token
+     */
     public function loginToAzuraCast($station_id) {
         $token = $this->getValidLoginToken($station_id);
         
@@ -138,6 +171,9 @@ class AzuracastModule extends Module {
         }
     }
 
+    /**
+     * Get valid login token (check expiration)
+     */
     private function getValidLoginToken($station_id) {
         $token_data = $this->Record->select(['token', 'expires_at'])
             ->from('azuracast_login_tokens')
@@ -150,6 +186,5 @@ class AzuracastModule extends Module {
 
         return $this->generateAzuraCastLoginToken($station_id);
     }
-
 }
 ?>
