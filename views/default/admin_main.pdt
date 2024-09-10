@@ -1,2 +1,22 @@
-<h2>Admin Panel</h2>
-<p>Manage your AzuraCast stations here.</p>
+<?php
+// Ensure fields are being passed to the view
+if (isset($fields)) { 
+?>
+    <form method="post" action="<?php echo $this->Html->safe($base_uri . "settings/company/modules/manage/" . $this->Html->ifSet($module->id)); ?>">
+        <div class="form-group">
+            <label for="station_url"><?php echo $this->Html->ifSet($fields['station_url']->label); ?></label>
+            <?php echo $this->Form->fieldText("station_url", $this->Html->ifSet($fields['station_url']->value), array('class' => 'form-control')); ?>
+        </div>
+
+        <div class="form-group">
+            <label for="api_key"><?php echo $this->Html->ifSet($fields['api_key']->label); ?></label>
+            <?php echo $this->Form->fieldText("api_key", $this->Html->ifSet($fields['api_key']->value), array('class' => 'form-control')); ?>
+        </div>
+
+        <div class="form-group">
+            <input type="submit" value="<?php echo Language::_("AzuracastModule.config.submit", true); ?>" class="btn btn-primary">
+        </div>
+    </form>
+<?php } else { ?>
+    <p>No fields available to configure. Please ensure the module is installed correctly.</p>
+<?php } ?>
