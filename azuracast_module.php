@@ -63,30 +63,30 @@ class AzuracastModule extends Module {
         ];
     }
 
-    public function addService($package, array $vars = null) {
+    public function addService($package, ?array $vars = null, $parent_package = null, $parent_service = null, $status = 'pending') {
         $config = $this->getConfig();
-
+    
         $api_url = $config['station_url'] . "/api/station";
         $api_key = $config['api_key'];
-
+    
         $data = array(
             'name' => $vars['station_name'],
             'short_name' => $vars['station_short_name'],
             'description' => $vars['description']
         );
-
+    
         $response = $this->azuracastApiRequest($api_url, $data, $api_key);
-
+    
         if ($response['status'] == 'success') {
             $login_token = $this->generateAzuraCastLoginToken($vars['email']);
             $this->storeLoginToken($response['station_id'], $login_token);
-
+    
             return array('success' => true, 'message' => "Station created successfully.");
         } else {
             return array('error' => true, 'message' => $response['message']);
         }
     }
-
+    
     private function generateAzuraCastLoginToken($email) {
         $config = $this->getConfig();
         $api_url = $config['station_url'] . "/api/auth/login-token";
