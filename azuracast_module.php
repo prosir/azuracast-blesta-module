@@ -1,30 +1,26 @@
 <?php
 class AzuracastModule extends Module {
-    private $Record;
+    public $Record;
 
     public function __construct() {
-        // Call parent constructor for module initialization
-        parent::__construct();
-
-        // Load the Record component for database interaction
         Loader::loadComponents($this, array("Record"));
-
-        // Load the language file for the module
-        Language::loadLang("azuracast_module", null, dirname(__FILE__) . DS . "language" . DS);
-
-        // Basic module information
-        $this->name = "Azuracast Module";
+        Language::loadLang("azuracast", null, dirname(__FILE__) . DS . "language" . DS);
+        
+        $this->name = "Azuracast";
         $this->version = "1.0.0";
         $this->authors = array(array('name' => 'Your Name', 'url' => 'https://yourwebsite.com'));
     }
 
     public function install() {
-        // Create a table to store AzuraCast login tokens
-        $this->Record->setField('station_id', array('type' => 'int', 'size' => 11, 'unsigned' => true))
-            ->setField('token', array('type' => 'varchar', 'size' => 255))
-            ->setField('expires_at', array('type' => 'datetime'))
-            ->setKey(array('station_id'), 'primary')
-            ->create('azuracast_login_tokens');
+        // Ensure table doesn't exist before creating it
+        $table_exists = $this->Record->query("SHOW TABLES LIKE 'azuracast_login_tokens'")->fetch();
+        if (!$table_exists) {
+            $this->Record->setField('station_id', array('type' => 'int', 'size' => 11, 'unsigned' => true))
+                ->setField('token', array('type' => 'varchar', 'size' => 255))
+                ->setField('expires_at', array('type' => 'datetime'))
+                ->setKey(array('station_id'), 'primary')
+                ->create('azuracast_login_tokens');
+        }
     }
 
     public function getSettings($module_row_id = null) {
@@ -48,7 +44,6 @@ class AzuracastModule extends Module {
 
     public function saveSettings($vars) {
         if (isset($vars['station_url']) && isset($vars['api_key'])) {
-            // Save the module settings
             return array('success' => true);
         } else {
             return array('error' => true, 'message' => "Both Station URL and API Key are required.");
@@ -65,28 +60,28 @@ class AzuracastModule extends Module {
 
     public function addService($package, ?array $vars = null, $parent_package = null, $parent_service = null, $status = 'pending') {
         $config = $this->getConfig();
-    
+
         $api_url = $config['station_url'] . "/api/station";
-        $api_key = $config['api_key']; 
-    
+        $api_key = $config['api_key'];
+
         $data = array(
             'name' => $vars['station_name'],
             'short_name' => $vars['station_short_name'],
             'description' => $vars['description']
         );
-    
+
         $response = $this->azuracastApiRequest($api_url, $data, $api_key);
-    
-        if ($response['status'] == 'success') { 
+
+        if ($response['status'] == 'success') {
             $login_token = $this->generateAzuraCastLoginToken($vars['email']);
             $this->storeLoginToken($response['station_id'], $login_token);
-    
+
             return array('success' => true, 'message' => "Station created successfully.");
         } else {
             return array('error' => true, 'message' => $response['message']);
         }
     }
-    
+
     private function generateAzuraCastLoginToken($email) {
         $config = $this->getConfig();
         $api_url = $config['station_url'] . "/api/auth/login-token";
