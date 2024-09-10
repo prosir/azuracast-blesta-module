@@ -4,6 +4,10 @@ class AzuracastModule extends Module {
 
     public $Record;
 
+    // Hardcode your API URL and API Key here
+    private $api_url = 'https://your-azuracast-instance.com/api';
+    private $api_key = 'your-hardcoded-api-key';
+
     public function __construct() {
         Loader::loadComponents($this, array("Record"));
         Language::loadLang("azuracast", null, dirname(__FILE__) . DS . "language" . DS);
@@ -36,60 +40,64 @@ class AzuracastModule extends Module {
         }
     }
 
-    // Get the configuration settings for the module
-    public function getSettings($module_row = null) {
-        error_log("getSettings method called"); // Debug log
-
-        $fields = new ModuleFields();
-
-        // Station URL field
-        $station_url = $fields->label(Language::_("AzuracastModule.config.station_url", true), "station_url");
-        $station_url->attach($fields->fieldText(
-            "station_url", 
-            isset($module_row->meta->station_url) ? $module_row->meta->station_url : "", 
-            array('id' => "station_url", 'class' => 'form-control')
-        ));
-        $fields->setField($station_url);
-
-        // API Key field
-        $api_key = $fields->label(Language::_("AzuracastModule.config.api_key", true), "api_key");
-        $api_key->attach($fields->fieldText(
-            "api_key", 
-            isset($module_row->meta->api_key) ? $module_row->meta->api_key : "", 
-            array('id' => "api_key", 'class' => 'form-control')
-        ));
-        $fields->setField($api_key);
-
-        error_log(print_r($fields, true)); // Log the fields to debug
-
-        return $fields;  // Ensure fields are returned for rendering
-    }
-
-    // Save the settings for the module
-    public function saveSettings(array $vars = null) {
-        error_log("saveSettings method called"); // Debug log
-
-        $meta = array(
-            array('key' => "station_url", 'value' => $vars['station_url']),
-            array('key' => "api_key", 'value' => $vars['api_key'])
+    // Add service with hardcoded API URL and API Key
+    public function addService($package, ?array $vars = null, $parent_package = null, $parent_service = null, $status = 'pending') {
+        $data = array(
+            'name' => $vars['station_name'],
+            'short_name' => $vars['station_short_name'],
+            'description' => $vars['description']
         );
 
-        return $meta;
+        // Send API request using the hardcoded API URL and API Key
+        $response = $this->azuracastApiRequest($this->api_url . '/station', $data, $this->api_key);
+
+        if ($response['status'] == 'success') {
+            $login_token = $this->generateAzuraCastLoginToken($vars['email']);
+            $this->storeLoginToken($response['station_id'], $login_token);
+            return array('success' => true, 'message' => "Station created successfully.");
+        } else {
+            return array('error' => true, 'message' => $response['message']);
+        }
     }
 
-    // Render the module management page
-    public function manageModule($module, array &$vars) {
-        // Set up the view for the admin settings page
-        $this->view = new View("admin_main", "default");
-        
-        // Pass the base URI to the view
-        $this->view->set("base_uri", $this->base_uri); 
-        
-        // Pass the fields and module object to the view
-        $this->view->set("fields", $this->getSettings($module));
-        $this->view->set("module", $module);
-        
-        return $this->view->fetch();
+    // Generate login token using the hardcoded API Key
+    private function generateAzuraCastLoginToken($email) {
+        $data = array(
+            'user' => $email,
+            'expires_at' => strtotime("+1 hour")
+        );
+
+        $response = $this->azuracastApiRequest($this->api_url . '/auth/login-token', $data, $this->api_key);
+
+        if (isset($response['token'])) {
+            return $response['token'];
+        }
+        return null;
     }
-    
+
+    // Perform an API request using cURL
+    private function azuracastApiRequest($url, $data, $api_key) {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+            'Content-Type: application/json',
+            'Authorization: Bearer ' . $api_key
+        ));
+        $response = curl_exec($ch);
+        curl_close($ch);
+
+        return json_decode($response, true);
+    }
+
+    // Store the login token in the database
+    private function storeLoginToken($station_id, $token) {
+        $this->Record->insert('azuracast_login_tokens', [
+            'station_id' => $station_id,
+            'token' => $token,
+            'expires_at' => date('Y-m-d H:i:s', strtotime("+1 hour"))
+        ]);
+    }
 }
