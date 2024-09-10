@@ -67,7 +67,7 @@ class AzuracastModule extends Module {
         $config = $this->getConfig();
     
         $api_url = $config['station_url'] . "/api/station";
-        $api_key = $config['api_key'];
+        $api_key = $config['api_key']; 
     
         $data = array(
             'name' => $vars['station_name'],
@@ -77,7 +77,7 @@ class AzuracastModule extends Module {
     
         $response = $this->azuracastApiRequest($api_url, $data, $api_key);
     
-        if ($response['status'] == 'success') {
+        if ($response['status'] == 'success') { 
             $login_token = $this->generateAzuraCastLoginToken($vars['email']);
             $this->storeLoginToken($response['station_id'], $login_token);
     
