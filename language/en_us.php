@@ -1,4 +1,10 @@
 <?php
+<?php
+// Config version ????
+$lang['Azuracast.name'] = "Azuracast";
+$lang['Azuracast.description'] = "Manage Azuracast stations.";
+
+
 $lang['AzuracastModule.name'] = "Azuracast Module";
 $lang['AzuracastModule.description'] = "Provision and manage radio stations on AzuraCast.";
 $lang['AzuracastModule.service_add_success'] = "The station was successfully created.";
