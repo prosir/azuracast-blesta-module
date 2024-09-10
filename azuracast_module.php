@@ -7,8 +7,6 @@ class AzuracastModule extends Module {
         Language::loadLang("azuracast", null, dirname(__FILE__) . DS . "language" . DS);
         $this->setName("AzuraCast");
         $this->setVersion("1.0.0");
-        $this->name = "Azuracast";
-        $this->version = "1.0.0";
         $this->authors = array(array('name' => 'Your Name', 'url' => 'https://yourwebsite.com'));
     }
 
